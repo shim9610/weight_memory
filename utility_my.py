@@ -1,3 +1,14 @@
+"""
+ViTClassifier: Utility Module for Vision Transformer-based Classification.
+Author: [SSY]
+Created: [2025-05-06]
+Description:
+    Defines a custom classifier model built upon a pre-trained Vision Transformer (ViT) encoder.
+    Extracts the [CLS] token from the transformer encoder output and applies additional
+    fully-connected layers to perform classification tasks.
+Usage:
+    from utility_my import ViTClassifier
+"""
 import torch.nn as nn
 
 class ViTClassifier(nn.Module):

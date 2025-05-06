@@ -1,3 +1,10 @@
+"""
+Author: [SSY]
+Created: [2025-05-06]
+Purpose: Training and Validation of ViT-MAE based Classifier Model (Using CIFAR-10 Dataset)
+Repository: https://github.com/shim9610/weight_memory
+License: Apache License 2.0 (Based on Hugging Face Transformers)
+"""
 from torchvision.datasets import CIFAR10
 from torchvision import transforms
 from torch.utils.data import DataLoader
@@ -15,6 +22,7 @@ transform = transforms.Compose([
     transforms.Resize((224, 224)),
     transforms.ToTensor(),
 ])
+
 # Load CIFAR-10 dataset
 train_dataset = CIFAR10(root='./data', train=True, transform=transform, download=True)
 test_dataset = CIFAR10(root='./data', train=False, transform=transform, download=True)
@@ -23,7 +31,6 @@ train_loader = DataLoader(
     train_dataset, batch_size=512, shuffle=True,
     num_workers=8, pin_memory=True
 )
-
 test_loader = DataLoader(
     test_dataset, batch_size=512, shuffle=False,
     num_workers=8, pin_memory=True
@@ -85,5 +92,6 @@ for epoch in range(100):
         best_loss = Val_loss
         torch.save(model.state_dict(), 'best_vit_classifier_cifar10.pt')
         print(f"🚩 Best model saved (Epoch {epoch+1},Train Loss: {avg_loss:.8f},Validation Loss: {Val_loss:.8f})")
+
 # final model saving
 torch.save(model.state_dict(), 'vit_classifier_cifar10.pt')
