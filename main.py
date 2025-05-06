@@ -50,7 +50,11 @@ model = ViTClassifier(encoder, num_classes=10).to(device)
 criterion = nn.CrossEntropyLoss()
 optimizer = AdamW(model.parameters(), lr=1e-4)
 model.train()
+
+# Early stopping parameters
 best_loss = float('inf')  # minimum loss for early stopping
+eraly_stop_counter=0
+limit=10
 # Training loop
 for epoch in range(100):
     model.train()
@@ -86,12 +90,16 @@ for epoch in range(100):
             logits = model(pixel_values)
             loss = criterion(logits, labels)
             val_loss += loss.item()
-    Val_loss = val_loss / len(test_loader)
-    print(f'Epoch {epoch+1},Train Loss: {avg_loss:.8f},Validation Loss: {Val_loss:.8f}')
-    if Val_loss < best_loss:
-        best_loss = Val_loss
+    val_loss_avg = val_loss / len(test_loader)
+    print(f'Epoch {epoch+1},Train Loss: {avg_loss:.8f},Validation Loss: {val_loss_avg:.8f}')
+    eraly_stop_counter+=1
+    if val_loss_avg < best_loss:
+        best_loss = val_loss_avg
         torch.save(model.state_dict(), 'best_vit_classifier_cifar10.pt')
-        print(f"🚩 Best model saved (Epoch {epoch+1},Train Loss: {avg_loss:.8f},Validation Loss: {Val_loss:.8f})")
-
+        print(f"🚩 Best model saved (Epoch {epoch+1},Train Loss: {avg_loss:.8f},Validation Loss: {val_loss_avg:.8f})")
+        eraly_stop_counter=0
+    if eraly_stop_counter>limit:
+        print(f"Early stopping at epoch {epoch+1} with validation loss: {val_loss_avg:.8f}")
+        break
 # final model saving
 torch.save(model.state_dict(), 'vit_classifier_cifar10.pt')
