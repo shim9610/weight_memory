@@ -25,8 +25,6 @@ By training Vision Transformer (ViT) based autoencoders (e.g., ViT-MAE) on vario
 ## Current Implementation
 
 * Utilizing Hugging Face Transformers (ViT-MAE) for classification tasks on CIFAR-10.
-* Training scripts with validation and best-model saving strategies.
-* Optimized GPU usage through efficient data loading and CUDA configurations.
 
 ## Architecture Diagram
 
@@ -97,8 +95,6 @@ Vision Transformer(ViT) 기반의 오토인코더(ViT-MAE 등)를 활용하여 �
 ## 현재 구현
 
 * Hugging Face Transformers를 사용하여 CIFAR-10 데이터셋에서 ViT-MAE 모델을 활용한 분류 작업 수행.
-* 검증 및 최적 모델 저장 전략 포함.
-* 효율적인 데이터 로딩과 CUDA 설정으로 GPU 활용 최적화.
 
 ## 아키텍처 다이어그램
 
