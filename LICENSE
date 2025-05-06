@@ -1,2 +1,5 @@
 ## License
 This repository is licensed under Apache License 2.0, as it is based on Hugging Face Transformers (https://github.com/huggingface/transformers).
+
+### Additional Notice
+All modifications, additions, or newly written code by [Your Name] are also licensed under Apache License 2.0.
