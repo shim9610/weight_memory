@@ -16,14 +16,18 @@ class ViTClassifier(nn.Module):
         super().__init__()
         self.encoder = encoder
         self.classifier = nn.Sequential(
-            nn.Linear(encoder.config.hidden_size, 256),
-            nn.GELU(),
-            nn.Dropout(0.2),
-            nn.Linear(256, num_classes)
+            nn.Linear(encoder.config.hidden_size, 256), # Intermediate linear layer
+            nn.GELU(),                                  # Non-linear activation
+            nn.Dropout(0.2),                            # Dropout for regularization    
+            nn.Linear(256, num_classes)                 # Final classification layer    
         )
 
     def forward(self, pixel_values):
-        encoder_outputs = self.encoder(pixel_values)
-        pooled_output = encoder_outputs.last_hidden_state[:, 0]  # [CLS] token
+        # Forward pass through encoder to obtain feature embeddings
+        encoder_outputs = self.encoder(pixel_values)  
+        # Use [CLS] token embedding (first token) for classification          
+        pooled_output = encoder_outputs.last_hidden_state[:, 0]
+        # Compute logits through classification head
         logits = self.classifier(pooled_output)
+        
         return logits
