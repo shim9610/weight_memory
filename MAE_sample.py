@@ -1,3 +1,14 @@
+"""
+Author: [SSY]
+Created: [2025-05-06]
+This file (MAE_sample.py) is copied from Hugging Face Transformers library for reference and debugging purposes only.
+
+Original source: https://github.com/huggingface/transformers
+License: Apache License 2.0 (see above for details)
+
+No modifications or proprietary claims have been made to this file.
+"""
+
 # coding=utf-8
 # Copyright 2022 Facebook AI and The HuggingFace Inc. team. All rights reserved.
 #
