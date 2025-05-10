@@ -113,6 +113,74 @@ class TrainViTClassifier():
                 break
         # final model saving
         torch.save(model.state_dict(), name+'.pt')
+    # -------------------------------------------------------------
+    # XPU-optimized training loop (no PIL, bf16 autocast, non-blocking transfers)
+    # -------------------------------------------------------------
+    def train_xpu(self, name='result', patience=5, max_epochs=100):
+        device, model, processor = self.device, self.model, self.processor
+        train_loader, test_loader = self.train_loader, self.test_loader
+
+        criterion  = nn.CrossEntropyLoss()
+        optimizer  = AdamW(model.parameters(), lr=1e-4)
+
+        best_val, patience_ctr = float('inf'), 0
+
+        for epoch in range(max_epochs):
+            # -------- train --------
+            model.train()
+            running = 0.0
+            for imgs, lbls in tqdm(train_loader, desc=f'E{epoch+1}-train', leave=False):
+                imgs  = imgs.to(device, non_blocking=True)
+                lbls  = lbls.to(device, non_blocking=True)
+
+                with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=device.type == "xpu"):
+                    px = processor(images=imgs,
+                            return_tensors="pt",
+                            do_rescale=False,  # <-- 중복 스케일링 끔
+                            do_resize=False,
+                            do_center_crop=False)["pixel_values"].to(device, non_blocking=True)
+                    logit = model(px)
+                    loss  = criterion(logit, lbls)
+
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                running += loss.item()
+
+            tr_loss = running / len(train_loader)
+
+            # -------- validate --------
+            model.eval()
+            val_running = 0.0
+            with torch.no_grad():
+                for imgs, lbls in tqdm(test_loader, desc=f'E{epoch+1}-val', leave=False):
+                    imgs = imgs.to(device, non_blocking=True)
+                    lbls = lbls.to(device, non_blocking=True)
+                    with torch.autocast(device_type=device.type, dtype=torch.bfloat16, enabled=device.type == "xpu"):
+                        px = processor(images=imgs,
+                            return_tensors="pt",
+                            do_rescale=False,  # <-- 중복 스케일링 끔
+                            do_resize=False,
+                            do_center_crop=False)["pixel_values"].to(device, non_blocking=True)
+                        logit = model(px)
+                        val_running += criterion(logit, lbls).item()
+
+            val_loss = val_running / len(test_loader)
+            print(f'Epoch {epoch+1}: train {tr_loss:.6f}  |  val {val_loss:.6f}')
+
+            # -------- early-stopping / checkpoint --------
+            if val_loss < best_val:
+                best_val, patience_ctr = val_loss, 0
+                torch.save(model.state_dict(), f'best_{name}.pt')
+                print(f'🚩 best updated → {best_val:.6f}')
+            else:
+                patience_ctr += 1
+                if patience_ctr > patience:
+                    print(f'⏹ early stop at epoch {epoch+1}')
+                    break
+
+        torch.save(model.state_dict(), f'{name}.pt')
+
         
         
 class ViTClassifier(nn.Module):
