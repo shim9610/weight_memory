@@ -16,10 +16,11 @@ from torchvision.datasets import CIFAR10
 from torchvision import transforms
 from transformers import AutoImageProcessor, ViTMAEModel
 from torch.utils.data import DataLoader
-
+from torch.utils.data import Subset
+from collections import OrderedDict
 from tqdm import tqdm
 class TrainViTClassifier():
-    def __init__(self, device, num_classes=10,size=224,dataset='cifar10',batch_size=512,num_workers=8):
+    def __init__(self, device,mode="classifier",weight_ref="best_result.pt" ,num_classes=10,size=224,dataset='cifar10',batch_size=512,num_workers=8,keep_labels=None):
         self.device = device
         self.transform = transforms.Compose([
             transforms.Resize((size, size)),
@@ -27,8 +28,21 @@ class TrainViTClassifier():
         ])
         if dataset=='cifar10':
             # Load CIFAR-10 dataset
-            self.train_dataset = CIFAR10(root='./data', train=True, transform=self.transform, download=True)
-            self.test_dataset = CIFAR10(root='./data', train=False, transform=self.transform, download=True)
+            full_train = CIFAR10(root='./data', train=True, transform=self.transform, download=True)
+            full_test = CIFAR10(root='./data', train=False, transform=self.transform, download=True)
+
+                        # ---------- 라벨 필터링 ----------
+            if keep_labels is not None:     # e.g. [0, 2, 8]  ← airplane, bird, ship
+                tr_idx = [i for i, t in enumerate(full_train.targets)
+                          if t in keep_labels]
+                te_idx = [i for i, t in enumerate(full_test.targets)
+                          if t in keep_labels]
+                self.train_dataset = Subset(full_train, tr_idx)
+                self.test_dataset  = Subset(full_test,  te_idx)
+            else:
+                self.train_dataset = full_train
+                self.test_dataset = full_test
+                
         else: 
             self.train_dataset = None
             self.test_dataset = None
@@ -42,16 +56,24 @@ class TrainViTClassifier():
             self.test_dataset, batch_size=batch_size, shuffle=False,
             num_workers=num_workers, pin_memory=True
         )
-
-        # Load the ViT-MAE model and processor
-        self.processor = AutoImageProcessor.from_pretrained('facebook/vit-mae-base')
-        self.encoder = ViTMAEModel.from_pretrained('facebook/vit-mae-base')
-        #freeze encoder parameters
-        for param in self.encoder.parameters():
-            param.requires_grad = False
-        # define the ViTClassifier
-        self.model = ViTClassifier(self.encoder, num_classes=num_classes).to(device)
-        
+        if mode=="classifier":
+            # Load the ViT-MAE model and processor
+            self.processor = AutoImageProcessor.from_pretrained('facebook/vit-mae-base')
+            self.encoder = ViTMAEModel.from_pretrained('facebook/vit-mae-base')
+            #freeze encoder parameters
+            for param in self.encoder.parameters():
+                param.requires_grad = False
+            # define the ViTClassifier
+            self.model = ViTClassifier(self.encoder, num_classes=num_classes).to(device)
+        elif mode == "encoder":
+                        # Load the ViT-MAE model and processor
+            self.processor = AutoImageProcessor.from_pretrained('facebook/vit-mae-base')
+            self.encoder = ViTMAEModel.from_pretrained('facebook/vit-mae-base')
+            # define the ViTClassifier
+            self.model = ViTClassifier(self.encoder,mode="freeze" ,num_classes=num_classes).to(device)
+            load_head_only(self.model, weight_ref, prefix="classifier.")
+            for p in self.model.classifier.parameters():       # head 완전 고정
+                p.requires_grad = False
     def train(self,name='result',limit=10,max_epochs=100):
         device = self.device
         model = self.model
@@ -181,10 +203,10 @@ class TrainViTClassifier():
 
         torch.save(model.state_dict(), f'{name}.pt')
 
-        
+
         
 class ViTClassifier(nn.Module):
-    def __init__(self, encoder, num_classes=10):
+    def __init__(self, encoder,mode="classifier" ,num_classes=10):
         super().__init__()
         self.encoder = encoder
         self.classifier = nn.Sequential(
@@ -193,6 +215,9 @@ class ViTClassifier(nn.Module):
             nn.Dropout(0.2),                            # Dropout for regularization    
             nn.Linear(256, num_classes)                 # Final classification layer    
         )
+        if mode == "freeze":
+            for param in self.classifier.parameters():
+                param.requires_grad = False
 
     def forward(self, pixel_values):
         # Forward pass through encoder to obtain feature embeddings
@@ -203,3 +228,26 @@ class ViTClassifier(nn.Module):
         logits = self.classifier(pooled_output)
         
         return logits
+    
+    
+    
+def load_head_only(model, ckpt_path, prefix="classifier."):
+    """
+    model        : ViTClassifier 인스턴스
+    ckpt_path    : torch.save(...) 했던 전체 state-dict 경로
+    prefix       : head 모듈 이름(기본 'classifier.')
+    """
+    full_sd = torch.load(ckpt_path, map_location="cpu")       # ① 전체 dict 로드
+    if "state_dict" in full_sd:                               #  (배터리포함 세이브일 경우)
+        full_sd = full_sd["state_dict"]
+
+    # ② prefix 에 맞는 키만 추려서 접두사 잘라 줌
+    head_sd = OrderedDict()
+    for k, v in full_sd.items():
+        if k.startswith("module."):           # DataParallel 저장본 처리
+            k = k[len("module."):]
+        if k.startswith(prefix):
+            head_sd[k[len(prefix):]] = v      # 'classifier.fc.weight' → 'fc.weight'
+
+    # ③ 분류기 서브모듈에 주입
+    model.classifier.load_state_dict(head_sd, strict=True)

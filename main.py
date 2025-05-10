@@ -24,5 +24,7 @@ def check_device():
 
 device = check_device()
 print(f"Using device: {device}")
-train=TrainViTClassifier(device,batch_size=32,num_workers=4)
-train.train_xpu(max_epochs=100)
+#train=TrainViTClassifier(device,batch_size=32,num_workers=4)
+#train.train_xpu(max_epochs=100)
+train=TrainViTClassifier(device,mode="encoder",batch_size=2,num_workers=1,keep_labels =[3])
+train.train_xpu(max_epochs=20,name="cat_3")
