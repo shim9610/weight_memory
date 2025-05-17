@@ -12,15 +12,20 @@ import torch
 # CUDA is available
 # Check if CUDA is available and set the device accordingly
 def check_device():
+    """Return the best available torch.device.
+
+    Checks for CUDA first, then Intel XPU if the attribute exists,
+    and falls back to CPU when neither accelerator is available.
+    """
     if torch.cuda.is_available():
         print("CUDA is available. Using GPU.")
         return torch.device("cuda")
-    elif torch.xpu.is_available():
+    elif hasattr(torch, "xpu") and torch.xpu.is_available():
         print("Intel XPU is available. Using XPU.")
         return torch.device("xpu")
     else:
-        print("CUDA and XPU is not available. Using CPU.")
-        return  torch.device("cpu")
+        print("CUDA and XPU are not available. Using CPU.")
+        return torch.device("cpu")
 
 device = check_device()
 print(f"Using device: {device}")
